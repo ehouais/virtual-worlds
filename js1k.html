@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+    <body style="margin: 0px; overflow: hidden; background-color: #fff">
+        <canvas width="100%" height="100%"></canvas>
+        <script>
+            var a = document.getElementsByTagName('canvas')[0];
+            var b = document.body;
+            var d = function(e){ return function(){ e.parentNode.removeChild(e); }; }(a);
+
+            // unprefix some popular vendor prefixed things (but stick to their original name)
+            var AudioContext =
+                  window.AudioContext ||
+                  window.webkitAudioContext;
+            var requestAnimationFrame =
+                  window.requestAnimationFrame ||
+                  window.mozRequestAnimationFrame ||
+                  window.webkitRequestAnimationFrame ||
+                  window.msRequestAnimationFrame ||
+                  function(f){ setTimeout(f, 1000/30); };
+
+            // fix bug in safari: http://qfox.nl/weblog/218
+            document.body.clientWidth;
+
+            // auto resize (original) canvas. call `onresize(w,h) to limit the size of the canvas
+            (window.onorientationchange = window.onresize = function(a){
+                var mw = Infinity;
+                var mh = Infinity;
+                var min = Math.min;
+
+                return function(w,h){
+                    if (arguments.length === 2) {
+                        mw = w;
+                        mh = h;
+                    }
+                    a.style.width = (a.width = min(mw, innerWidth)) + 'px';
+                    a.style.height = (a.height = min(mh, innerHeight)) + 'px';
+                };
+            }(a))();
+
+            var c = a.getContext('2d');
+
+            // Demo -------------------------------------------
+
+            // init variables
+            var N = 256,        // terrain size
+                M = [],         // terrain array
+                I,
+                J,
+                R = [];         // color array
+
+                W = a.height;
+                H = W/2;
+                D = 200/H;
+                L = D/2
+                //N        // terrain size => nb. points = 220
+                //S             // variable pixel column width
+                B =             // direction 1st derivative
+                K = 0;          // keyboard state
+                A = 1.2;          // direction
+                X = Y = 1E9;
+                Z = 9;            // altitude
+                g = [];
+
+            // compute random set of terrain generator points
+            for (
+                k = 0;
+                k < N/1.5;
+                k++
+            ) {
+                R[k] = [N*Math.random(), N*Math.random()];
+            }
+
+            // create terrain
+            f = N/100;
+            for (
+                I = 0;  //  first point coordinate
+                I < N;
+                I++
+            ) {
+                for (
+                    J = N+1,    // second point coordinate
+                    M[I] = [],  // init row of terrain points
+                    n = 0;      // last altitude
+                    J > 0;
+                    J--,
+                    n = m       // buffer current alitude
+                ) {
+                    for (
+                        s =         // accumulated weighted influences
+                        t =         // accumulated weightings
+                        k = 0;      // generator index
+                        u = R[k];   // traverse all generator points
+                        k++
+                    ) {
+                        di = Math.abs(I-u[0]);
+                        dj = Math.abs(J-u[1]);
+                        //d = Math.hypot(di, dj); // shortest distance between terrain point and generator point
+                        d = Math.hypot(Math.min(di, N-di), Math.min(dj, N-dj)); // shortest distance between terrain point and generator point
+                        w = 1/Math.pow(d, 4);                      // inverse distance weighting width power 2
+                        t += w;                         // accumulate weightings
+                        s += k&1
+                          && k*w;                       // accumulate pondered generator influence (where influence = generator index)
+                    }
+
+                    M[I%N][J%N] = [
+                        m = s/t/f,                                 // altitude is proportional to inverse distance weighting of all generators for this terrain position
+                          //+ (Math.random() < 0.1 && Math.random()), // random bumps in terrain
+                        m > 13 ? 24 : m,                            // altitude for "Monument Valley" terrain style
+                        m,                                          // altitude for regular terrain style
+                        Math.max(0, m - 5 + 5*Math.cos(I/41)),      // altitude for "flooded area" terrain style
+                        12 - 8*Math.atan(n-m)                       // shading computed from altitude difference
+                    ]
+                }
+            }
+
+            // rendering function
+            setInterval(function() {
+                a.height = a.height; // canvas white reset
+
+                // draw fillrects grouped by color, to minimize number of costly fillStyle changes
+                for (
+                    u,      // list of blocks to render
+                    k = 0;
+                    k < 50; // fifty shades of grey
+                    k++
+                ) {
+                    for (
+                        u = R[k],                               // = [height1, x1, y1, width1, height2, x2, y2, width2, ...]
+                        c.fillStyle = 'hsl(28,50%,'+k*2+'%)';   // 1-dimensional palette is bound to index 
+                        h = u.shift();                          // until no more block in list
+                    ) {
+                        c.fillRect(u.shift(), u.shift(), u.shift(), h+1);
+                    }
+                }
+
+                r = 512/N;
+
+                // render terrain using 2D
+                for (
+                    I = 0;  //  first point coordinate
+                    I < N;
+                    I++
+                ) {
+                    for (
+                        J = 0;      // second point coordinate
+                        J < N;
+                        J++
+                    ) {
+                        u = M[I][J];
+                        R[0|u[4]].push(r, r*I, r*(N-J), r);
+                    }
+                }
+
+                // render terrain using iso 2.5D
+                for (
+                    I = N-1;
+                    I >= 0;
+                    I--
+                ) {
+                    for (
+                        J = N-1;
+                        J > 0;
+                        J--
+                    ) {
+                        m = M[I][J];
+                        h = m[2]+r;
+                        // Pixel blocks are overlapping so we can't use fillStyle grouping optimization
+                        c.fillStyle = 'hsl(28,50%,'+(0|m[4])*2+'%)';
+                        c.fillRect(r*(N+N+I-J), r*(N-(I+J)/2)-h, r, h);
+                    }
+                }
+            }, 33);
+        </script>
+    </body>
+</html>
